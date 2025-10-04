@@ -44,15 +44,9 @@ def load_model():
     """Load the YOLO model"""
     global model
     try:
-        # Try to load the best model first, fallback to yolo11n.pt
-        model_path = "yolo11n.pt"  # Using the smaller model for better performance on Railway
-        if os.path.exists(model_path):
-            model = YOLO(model_path)
-            logger.info(f"Model loaded successfully from {model_path}")
-        else:
-            # If no local model, use pretrained
-            model = YOLO('yolo11n.pt')
-            logger.info("Using pretrained YOLO11n model")
+        # Use pretrained model - it will be downloaded automatically
+        model = YOLO('yolo11n.pt')  # This will download if not present
+        logger.info("YOLO11n model loaded successfully")
     except Exception as e:
         logger.error(f"Error loading model: {str(e)}")
         raise e
