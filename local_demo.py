@@ -15,9 +15,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="Stroke Detection API",
-    description="API for detecting stroke symptoms in facial images",
-    version="1.0.0"
+    title="Stroke Detection API - Local Demo",
+    description="Local demo API for testing stroke detection interface",
+    version="1.0.0-local"
 )
 
 # Add CORS middleware
@@ -29,31 +29,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Stroke detection classes for demo
+# Simulated stroke detection classes
 CLASS_NAMES = [
     'normalEye', 'normalMouth', 'strokeEyeMid', 'strokeEyeSevere', 
     'strokeEyeWeak', 'strokeMouthMid', 'strokeMouthSevere', 'strokeMouthWeak'
 ]
 
 def simulate_predictions(image_array: np.ndarray) -> List[Dict[str, Any]]:
-    """Simulate stroke detection predictions"""
+    """Simulate YOLO predictions for demo purposes"""
     height, width = image_array.shape[:2]
     
-    # Generate 1-3 random predictions
+    # Generate random predictions to simulate model output
     num_predictions = random.randint(1, 3)
     predictions = []
     
     for i in range(num_predictions):
+        # Randomly select a class
         class_id = random.randint(0, len(CLASS_NAMES) - 1)
         class_name = CLASS_NAMES[class_id]
         
-        # Random bounding box
+        # Generate random bounding box
         x1 = random.randint(0, width // 2)
         y1 = random.randint(0, height // 2)
         x2 = random.randint(x1 + 50, width)
         y2 = random.randint(y1 + 50, height)
         
-        confidence = random.uniform(0.6, 0.95)
+        # Generate confidence score
+        confidence = random.uniform(0.5, 0.95)
         
         prediction = {
             "class_id": class_id,
@@ -74,11 +76,11 @@ def simulate_predictions(image_array: np.ndarray) -> List[Dict[str, Any]]:
 async def root():
     """Health check endpoint"""
     return {
-        "message": "Stroke Detection API is running",
+        "message": "Stroke Detection API - Local Demo",
         "model_loaded": True,
         "classes": CLASS_NAMES,
         "demo": "/demo",
-        "note": "Cloud demo with simulated predictions"
+        "note": "This is a local demo with simulated predictions"
     }
 
 @app.get("/demo")
@@ -88,8 +90,8 @@ async def demo():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for Railway"""
-    return {"status": "healthy", "model_loaded": True, "mode": "simulation"}
+    """Health check endpoint"""
+    return {"status": "healthy", "model_loaded": True, "mode": "local_demo"}
 
 def process_image(image_bytes: bytes) -> np.ndarray:
     """Convert uploaded image to numpy array"""
@@ -108,64 +110,6 @@ def process_image(image_bytes: bytes) -> np.ndarray:
     except Exception as e:
         logger.error(f"Error processing image: {str(e)}")
         raise HTTPException(status_code=400, detail="Invalid image format")
-
-def format_predictions(results) -> List[Dict[str, Any]]:
-    """Format YOLO predictions into JSON response"""
-    predictions = []
-    
-    for result in results:
-        boxes = result.boxes
-        if boxes is not None:
-            for i in range(len(boxes)):
-                box = boxes[i]
-                prediction = {
-                    "class_id": int(box.cls[0]),
-                    "class_name": CLASS_NAMES[int(box.cls[0])],
-                    "confidence": float(box.conf[0]),
-                    "bbox": {
-                        "x1": float(box.xyxy[0][0]),
-                        "y1": float(box.xyxy[0][1]),
-                        "x2": float(box.xyxy[0][2]),
-                        "y2": float(box.xyxy[0][3])
-                    }
-                }
-                predictions.append(prediction)
-    
-    return predictions
-
-@app.post("/predict")
-async def predict_stroke(file: UploadFile = File(...)):
-    """
-    Predict stroke symptoms from uploaded image - CLOUD DEMO
-    """
-    # Validate file type
-    if not file.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="File must be an image")
-    
-    try:
-        # Read image bytes
-        image_bytes = await file.read()
-        
-        # Process image
-        image_array = process_image(image_bytes)
-        
-        # Simulate predictions
-        predictions = simulate_predictions(image_array)
-        
-        # Analyze results for stroke indicators
-        stroke_indicators = analyze_stroke_indicators(predictions)
-        
-        return {
-            "filename": file.filename,
-            "predictions": predictions,
-            "stroke_analysis": stroke_indicators,
-            "total_detections": len(predictions),
-            "note": "🌐 CLOUD DEMO: Simulated predictions for testing"
-        }
-        
-    except Exception as e:
-        logger.error(f"Error during prediction: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 def analyze_stroke_indicators(predictions: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Analyze predictions to determine stroke indicators"""
@@ -221,21 +165,44 @@ def get_severity(class_name: str) -> str:
     else:
         return "unknown"
 
-def get_severity(class_name: str) -> str:
-    """Extract severity level from class name"""
-    if "severe" in class_name.lower():
-        return "severe"
-    elif "mid" in class_name.lower():
-        return "moderate"
-    elif "weak" in class_name.lower():
-        return "mild"
-    else:
-        return "unknown"
+@app.post("/predict")
+async def predict_stroke(file: UploadFile = File(...)):
+    """
+    Predict stroke symptoms from uploaded image - LOCAL DEMO VERSION
+    """
+    # Validate file type
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    try:
+        # Read image bytes
+        image_bytes = await file.read()
+        
+        # Process image
+        image_array = process_image(image_bytes)
+        
+        # Simulate predictions (in real version, this would be model(image_array))
+        predictions = simulate_predictions(image_array)
+        
+        # Analyze results for stroke indicators
+        stroke_indicators = analyze_stroke_indicators(predictions)
+        
+        return {
+            "filename": file.filename,
+            "predictions": predictions,
+            "stroke_analysis": stroke_indicators,
+            "total_detections": len(predictions),
+            "note": "🔬 LOCAL DEMO: These are simulated results for testing purposes"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error during prediction: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 @app.post("/batch_predict")
 async def batch_predict(files: List[UploadFile] = File(...)):
     """
-    Predict stroke symptoms from multiple uploaded images - CLOUD DEMO
+    Predict stroke symptoms from multiple uploaded images - LOCAL DEMO
     """
     if len(files) > 10:  # Limit batch size
         raise HTTPException(status_code=400, detail="Maximum 10 files allowed per batch")
@@ -277,20 +244,24 @@ async def batch_predict(files: List[UploadFile] = File(...)):
     return {
         "batch_results": results, 
         "total_processed": len(results),
-        "note": "🌐 CLOUD DEMO: Simulated predictions for testing"
+        "note": "🔬 LOCAL DEMO: These are simulated results for testing purposes"
     }
 
 @app.get("/model_info")
 async def get_model_info():
-    """Get information about the model"""
+    """Get information about the loaded model"""
     return {
-        "model_type": "Cloud Demo Simulator",
+        "model_type": "Local Demo Simulator",
         "classes": CLASS_NAMES,
         "num_classes": len(CLASS_NAMES),
         "model_loaded": True,
-        "note": "Simulated stroke detection for cloud demo"
+        "note": "This is a local demo with simulated predictions"
     }
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
+    print("🚀 Starting Local Stroke Detection Demo API...")
+    print(f"📱 Demo URL: http://localhost:{port}/demo")
+    print(f"📚 API Docs: http://localhost:{port}/docs")
+    print("⚠️  Note: This is a demo with simulated predictions")
     uvicorn.run(app, host="0.0.0.0", port=port)
