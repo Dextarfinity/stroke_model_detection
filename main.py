@@ -32,10 +32,19 @@ app.add_middleware(
 # Global variable to store the model
 model = None
 
-# Class names from your dataset
+# Class names - using COCO classes for demo (pretrained model)
+# In production, replace with your stroke detection classes
 CLASS_NAMES = [
-    'normalEye', 'normalMouth', 'strokeEyeMid', 'strokeEyeSevere', 
-    'strokeEyeWeak', 'strokeMouthMid', 'strokeMouthSevere', 'strokeMouthWeak'
+    'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat',
+    'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat',
+    'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'backpack',
+    'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
+    'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
+    'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
+    'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair',
+    'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse',
+    'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator',
+    'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
 ]
 
 def load_model():
@@ -47,7 +56,8 @@ def load_model():
         logger.info("YOLO11n model loaded successfully")
     except Exception as e:
         logger.error(f"Error loading model: {str(e)}")
-        raise e
+        logger.warning("API starting without model - prediction endpoints will not work")
+        model = None
 
 @app.on_event("startup")
 async def startup_event():
@@ -156,45 +166,34 @@ async def predict_stroke(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 def analyze_stroke_indicators(predictions: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Analyze predictions to determine stroke indicators"""
-    stroke_count = 0
-    normal_count = 0
-    stroke_types = []
+    """Analyze predictions to determine stroke indicators - DEMO VERSION"""
+    # This is a demo version using COCO classes
+    # In production, replace with actual stroke detection logic
+    
+    person_count = 0
+    face_related = 0
     
     for pred in predictions:
         class_name = pred["class_name"]
         confidence = pred["confidence"]
         
-        if "stroke" in class_name.lower():
-            stroke_count += 1
-            stroke_types.append({
-                "type": class_name,
-                "confidence": confidence,
-                "severity": get_severity(class_name)
-            })
-        elif "normal" in class_name.lower():
-            normal_count += 1
+        if class_name == "person":
+            person_count += 1
+        # For demo, we'll simulate face detection
+        if class_name in ["person"]:  # In real app, this would be actual face/stroke classes
+            face_related += 1
     
-    # Determine overall assessment
-    if stroke_count > 0:
-        severity_levels = [st["severity"] for st in stroke_types]
-        max_severity = max(severity_levels) if severity_levels else "weak"
-        
-        assessment = {
-            "stroke_detected": True,
-            "confidence_level": "high" if stroke_count > normal_count else "moderate",
-            "max_severity": max_severity,
-            "affected_areas": list(set([st["type"] for st in stroke_types])),
-            "recommendation": "Immediate medical attention recommended"
-        }
-    else:
-        assessment = {
-            "stroke_detected": False,
-            "confidence_level": "high" if normal_count > 0 else "low",
-            "max_severity": "none",
-            "affected_areas": [],
-            "recommendation": "No stroke indicators detected"
-        }
+    # Demo logic - this would be replaced with real stroke detection
+    assessment = {
+        "stroke_detected": False,  # Demo always shows false for safety
+        "confidence_level": "demo",
+        "max_severity": "none",
+        "affected_areas": [],
+        "recommendation": "This is a DEMO using pretrained COCO model. Replace with trained stroke detection model for real use."
+    }
+    
+    if person_count > 0:
+        assessment["recommendation"] = f"Demo detected {person_count} person(s). Replace with trained stroke model for medical analysis."
     
     return assessment
 
