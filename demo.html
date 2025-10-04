@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stroke Detection API - Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        .upload-area:hover {
+            border-color: #007bff;
+        }
+        .upload-area.dragover {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .results {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            display: none;
+        }
+        .prediction {
+            background: white;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .stroke-detected {
+            border-left-color: #dc3545;
+        }
+        .normal-detected {
+            border-left-color: #28a745;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .confidence {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .preview-image {
+            max-width: 300px;
+            max-height: 300px;
+            margin: 10px auto;
+            display: block;
+            border-radius: 5px;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 Stroke Detection API Demo</h1>
+        <p style="text-align: center; color: #666;">
+            Upload facial images to detect potential stroke symptoms using AI
+        </p>
+        
+        <div class="warning">
+            <strong>⚠️ Medical Disclaimer:</strong> This tool is for educational and research purposes only. 
+            It should not be used as a substitute for professional medical diagnosis. 
+            Always consult with qualified healthcare professionals for medical advice.
+        </div>
+        
+        <div class="upload-area" id="uploadArea">
+            <p>📁 Click to select images or drag and drop here</p>
+            <p style="color: #888; font-size: 14px;">Supports: JPG, PNG, GIF (Max 10 files)</p>
+            <input type="file" id="fileInput" multiple accept="image/*">
+            <button onclick="document.getElementById('fileInput').click()">Choose Files</button>
+        </div>
+        
+        <div style="text-align: center;">
+            <button id="predictBtn" onclick="predictImages()" disabled>🔍 Analyze Images</button>
+            <button id="clearBtn" onclick="clearResults()">🗑️ Clear</button>
+        </div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Analyzing images...</p>
+        </div>
+        
+        <div id="results" class="results"></div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin; // Use same domain as the page
+        let selectedFiles = [];
+
+        // File input handling
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+        
+        // Drag and drop handling
+        const uploadArea = document.getElementById('uploadArea');
+        uploadArea.addEventListener('dragover', handleDragOver);
+        uploadArea.addEventListener('dragleave', handleDragLeave);
+        uploadArea.addEventListener('drop', handleDrop);
+
+        function handleFileSelect(e) {
+            selectedFiles = Array.from(e.target.files);
+            updateUI();
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            selectedFiles = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+            updateUI();
+        }
+
+        function updateUI() {
+            const predictBtn = document.getElementById('predictBtn');
+            const uploadArea = document.getElementById('uploadArea');
+            
+            if (selectedFiles.length > 0) {
+                predictBtn.disabled = false;
+                uploadArea.innerHTML = `
+                    <p>📁 ${selectedFiles.length} file(s) selected</p>
+                    <p style="color: #007bff;">${selectedFiles.map(f => f.name).join(', ')}</p>
+                    <button onclick="document.getElementById('fileInput').click()">Choose Different Files</button>
+                `;
+            } else {
+                predictBtn.disabled = true;
+                uploadArea.innerHTML = `
+                    <p>📁 Click to select images or drag and drop here</p>
+                    <p style="color: #888; font-size: 14px;">Supports: JPG, PNG, GIF (Max 10 files)</p>
+                    <input type="file" id="fileInput" multiple accept="image/*">
+                    <button onclick="document.getElementById('fileInput').click()">Choose Files</button>
+                `;
+                document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+            }
+        }
+
+        async function predictImages() {
+            if (selectedFiles.length === 0) return;
+
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const predictBtn = document.getElementById('predictBtn');
+            
+            loading.style.display = 'block';
+            results.style.display = 'none';
+            predictBtn.disabled = true;
+
+            try {
+                if (selectedFiles.length === 1) {
+                    await predictSingle();
+                } else {
+                    await predictBatch();
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            } finally {
+                loading.style.display = 'none';
+                predictBtn.disabled = false;
+            }
+        }
+
+        async function predictSingle() {
+            const formData = new FormData();
+            formData.append('file', selectedFiles[0]);
+
+            const response = await fetch(`${API_URL}/predict`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                displaySingleResult(data);
+            } else {
+                showError(data.detail || 'Prediction failed');
+            }
+        }
+
+        async function predictBatch() {
+            const formData = new FormData();
+            selectedFiles.forEach(file => {
+                formData.append('files', file);
+            });
+
+            const response = await fetch(`${API_URL}/batch_predict`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                displayBatchResults(data);
+            } else {
+                showError(data.detail || 'Batch prediction failed');
+            }
+        }
+
+        function displaySingleResult(data) {
+            const results = document.getElementById('results');
+            const strokeDetected = data.stroke_analysis.stroke_detected;
+            
+            results.innerHTML = `
+                <h3>📊 Analysis Results</h3>
+                <div class="prediction ${strokeDetected ? 'stroke-detected' : 'normal-detected'}">
+                    <h4>📁 ${data.filename}</h4>
+                    <p><strong>🔍 Detections:</strong> ${data.total_detections}</p>
+                    <p><strong>⚠️ Stroke Detected:</strong> ${strokeDetected ? 'Yes' : 'No'}</p>
+                    ${strokeDetected ? `
+                        <p><strong>📈 Severity:</strong> ${data.stroke_analysis.max_severity}</p>
+                        <p><strong>🎯 Confidence:</strong> ${data.stroke_analysis.confidence_level}</p>
+                        <p><strong>📍 Affected Areas:</strong> ${data.stroke_analysis.affected_areas.join(', ')}</p>
+                    ` : ''}
+                    <p><strong>💡 Recommendation:</strong> ${data.stroke_analysis.recommendation}</p>
+                    
+                    ${data.predictions.length > 0 ? `
+                        <h5>🎯 Detailed Predictions:</h5>
+                        ${data.predictions.map(pred => `
+                            <p>• <span class="confidence">${pred.class_name}</span> (${(pred.confidence * 100).toFixed(1)}%)</p>
+                        `).join('')}
+                    ` : ''}
+                </div>
+            `;
+            results.style.display = 'block';
+        }
+
+        function displayBatchResults(data) {
+            const results = document.getElementById('results');
+            
+            results.innerHTML = `
+                <h3>📊 Batch Analysis Results</h3>
+                <p><strong>📁 Total Processed:</strong> ${data.total_processed}</p>
+                
+                ${data.batch_results.map(result => {
+                    if (result.error) {
+                        return `
+                            <div class="prediction error">
+                                <h4>❌ ${result.filename}</h4>
+                                <p>Error: ${result.error}</p>
+                            </div>
+                        `;
+                    }
+                    
+                    const strokeDetected = result.stroke_analysis.stroke_detected;
+                    return `
+                        <div class="prediction ${strokeDetected ? 'stroke-detected' : 'normal-detected'}">
+                            <h4>📁 ${result.filename}</h4>
+                            <p><strong>🔍 Detections:</strong> ${result.total_detections}</p>
+                            <p><strong>⚠️ Stroke Detected:</strong> ${strokeDetected ? 'Yes' : 'No'}</p>
+                            ${strokeDetected ? `
+                                <p><strong>📈 Severity:</strong> ${result.stroke_analysis.max_severity}</p>
+                                <p><strong>🎯 Confidence:</strong> ${result.stroke_analysis.confidence_level}</p>
+                            ` : ''}
+                            <p><strong>💡 Recommendation:</strong> ${result.stroke_analysis.recommendation}</p>
+                        </div>
+                    `;
+                }).join('')}
+            `;
+            results.style.display = 'block';
+        }
+
+        function showError(message) {
+            const results = document.getElementById('results');
+            results.innerHTML = `
+                <div class="error">
+                    <h3>❌ Error</h3>
+                    <p>${message}</p>
+                </div>
+            `;
+            results.style.display = 'block';
+        }
+
+        function clearResults() {
+            selectedFiles = [];
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('fileInput').value = '';
+            updateUI();
+        }
+
+        // Check API health on load
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                if (!response.ok) {
+                    showError('API is not responding. Please check if the service is running.');
+                }
+            } catch (error) {
+                showError('Cannot connect to API. Please check if the service is running.');
+            }
+        });
+    </script>
+</body>
+</html>
